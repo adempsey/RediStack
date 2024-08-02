@@ -67,4 +67,26 @@ extension RedisClient {
         return send(command: "XDEL", with: args)
             .tryConverting()
     }
+
+    /// Trims the stream by evicting older entries (entries with lower IDs) if needed.
+    /// Will evict entries as long as the stream's length exceeds the specified threshold.
+    ///
+    /// See [https://redis.io/commands/xtrim](https://redis.io/commands/xtrim)
+    /// - Parameters:
+    ///     - threshold: The maximum length of the stream to remain after evicting entries.
+    ///     - key: The key of the stream.
+    /// - Returns: The number of entries that were deleted.
+    public func xtrim(to threshold: Int, from key: RedisKey) -> EventLoopFuture<Int> {
+        assert(threshold >= 0, "Stream cannot be trimmed to a negative length")
+        guard threshold >= 0 else { return self.eventLoop.makeSucceededFuture(0) }
+
+        let args: [RESPValue] = [
+            .init(from: key),
+            .init(bulk: "MAXLEN"),
+            .init(bulk: threshold)
+        ]
+        return send(command: "XTRIM", with: args)
+            .tryConverting()
+    }
+
 }
