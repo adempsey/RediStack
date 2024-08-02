@@ -46,4 +46,25 @@ extension RedisClient {
         let args = [RESPValue(from: key)]
         return send(command: "XLEN", with: args).tryConverting()
     }
+
+
+    /// Removes the specified entries from a stream, and returns the number
+    /// of entries deleted. This number may be less than the number of IDs
+    /// passed to the command in the case where some of the specified IDs
+    /// do not exist in the stream.
+    ///
+    /// See [https://redis.io/commands/xdel](https://redis.io/commands/xdel)
+    /// - Parameters:
+    ///     - fields: The list of entry IDs that should be removed from the stream.
+    ///     - key: The key of the stream.
+    /// - Returns: The number of entries that were deleted.
+    public func xdel(_ fields: String..., from key: RedisKey) -> EventLoopFuture<Int> {
+        guard fields.count > 0 else { return self.eventLoop.makeSucceededFuture(0) }
+
+        var args: [RESPValue] = [.init(from: key)]
+        args.append(convertingContentsOf: fields)
+
+        return send(command: "XDEL", with: args)
+            .tryConverting()
+    }
 }
