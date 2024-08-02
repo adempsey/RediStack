@@ -89,4 +89,32 @@ extension RedisClient {
             .tryConverting()
     }
 
+    /// Read data from one or multiple streams, only returning entries with
+    /// an ID greater than the last received ID reported by the caller.
+    ///
+    /// See [https://redis.io/commands/xread](https://redis.io/commands/xread)
+    /// - Parameters:
+    ///     - streams: Dictionary mapping stream keys to the entry IDs
+    ///       to begin reading after.
+    ///     - count: The maximum number of entries to return for each stream.
+    /// - Returns: 
+    public func xread<Value: RESPValueConvertible>(
+        from streams: [Value: Value],
+        _ count: UInt = 0
+        ) -> EventLoopFuture<[RESPValue]> {
+
+            var streamList = [Value]()
+            for (key, value) in streams {
+                streamList.append(key)
+                streamList.append(value)
+            }
+            var args: [RESPValue] = [
+                .init(bulk: "COUNT"),
+                .init(from: count),
+                .init(bulk: "STREAMS"),
+            ]
+            args.append(convertingContentsOf: streamList)
+
+            return send(command: "XREAD", with: args).tryConverting()
+    }
 }
