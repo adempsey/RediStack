@@ -48,4 +48,23 @@ final class StreamCommandsTests: RediStackIntegrationTestCase {
         XCTAssertEqual(numDeleted, 2)
     }
 
+    func test_xread() throws {
+        for _ in 1...3 {
+        _ = try connection.xadd(["foo": "bar"], to: #function).wait()
+        }
+        let response: [RESPValue] = try connection.xread(from: [#function: "0-0"]).wait()
+        XCTAssertEqual(response.count, 1)
+        let streamResults: [RESPValue] = response[0].array!
+        let streamName = streamResults[0].string
+        XCTAssertEqual(streamName, #function)
+
+        let streamEntries = streamResults[1].array!
+        XCTAssertEqual(streamEntries.count, 3)
+
+        XCTAssert(streamEntries.allSatisfy { entryPairRESP in
+            let entryPair = entryPairRESP.array!
+            let fields = entryPair[1].array!
+            return fields.count == 2
+        })
+    }
 }
