@@ -14,6 +14,7 @@
 
 import NIOCore
 
+
 // MARK: General
 
 extension RedisClient {
@@ -89,6 +90,8 @@ extension RedisClient {
             .tryConverting()
     }
 
+    public typealias XReadResult = [(String, [(String, [String: String])])]
+
     /// Read data from one or multiple streams, only returning entries with
     /// an ID greater than the last received ID reported by the caller.
     ///
@@ -97,11 +100,26 @@ extension RedisClient {
     ///     - streams: Dictionary mapping stream keys to the entry IDs
     ///       to begin reading after.
     ///     - count: The maximum number of entries to return for each stream.
-    /// - Returns: 
+    /// - Returns: A list of 2-tuples, the first element of which is the name
+    ///            of a stream, and the second element of which is a list of
+    ///            the stream's entries. Each entry is a 2-tuple, the first
+    ///            element of which is the entry ID and the second of which
+    ///            is a dictionary mapping entry field keys to values.
+    ///            For example:
+    ///            [
+    ///                 ("stream1", [
+    ///                     ("id-1234", ["foo": "bar"]),
+    ///                     ("id-5678", ["baz": "qux"]),
+    ///                 ]),
+    ///                 ("stream2", [
+    ///                     ("id-1234", ["foo": "bar"]),
+    ///                     ("id-5678", ["baz": "qux"]),
+    ///                 ]),
+    ///            ]
     public func xread<Value: RESPValueConvertible>(
         from streams: [Value: Value],
         _ count: UInt = 0
-        ) -> EventLoopFuture<[RESPValue]> {
+        ) -> EventLoopFuture<XReadResult> {
 
             var streamList = [Value]()
             for (key, value) in streams {
@@ -115,6 +133,28 @@ extension RedisClient {
             ]
             args.append(convertingContentsOf: streamList)
 
-            return send(command: "XREAD", with: args).tryConverting()
+            return send(command: "XREAD", with: args)
+                .map { (resultRESP: RESPValue) in
+                    guard let results: [RESPValue] = Array(fromRESP: resultRESP) else { return [] }
+                    return results.map { (result: RESPValue) -> (String,[(String, [String: String])]) in
+                        guard let streamResults: [RESPValue]  = result.array else { return ("", []) }
+                        guard let stream: String = streamResults[0].string else { return ("", []) }
+                        guard let entries: [RESPValue] = streamResults[1].array else { return (stream, [])}
+                        let decodedEntries: [(String, [String: String])] = entries.map { (entry: RESPValue) in
+                            guard let decodedEntry: [RESPValue] = entry.array else { return ("", [:]) }
+                            guard let entryID: String = decodedEntry[0].string else { return ("", [:])}
+
+                            guard let fieldArray: [RESPValue] = decodedEntry[1].array else { return (entryID, [:])}
+                            var fields: [String: String] = [:]
+                            for i in stride(from: 0, to: fieldArray.count, by: 2) {
+                                if i + 1 < fieldArray.count {
+                                    fields[fieldArray[i].string!] = fieldArray[i+1].string
+                                }
+                            }
+                            return (entryID, fields)
+                        }
+                        return (stream, decodedEntries)
+                    }
+                }
     }
 }

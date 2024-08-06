@@ -16,10 +16,16 @@
 import RediStackTestUtils
 import XCTest
 
+public typealias XReadResult = [(String, [(String, [String: String])])]
+
 final class StreamCommandsTests: RediStackIntegrationTestCase {
 
     func test_xadd() throws {
+        var streamLength: Int = try connection.send(command: "XLEN", with: [#function.convertedToRESPValue()]).wait().int!
+        XCTAssertEqual(streamLength, 0)
         let entry_id = try connection.xadd(["foo": "bar"], to: #function).wait()
+        streamLength = try connection.send(command: "XLEN", with: [#function.convertedToRESPValue()]).wait().int!
+        XCTAssertEqual(streamLength, 1)
         XCTAssertNotNil(entry_id)
     }
 
@@ -50,21 +56,19 @@ final class StreamCommandsTests: RediStackIntegrationTestCase {
 
     func test_xread() throws {
         for _ in 1...3 {
-        _ = try connection.xadd(["foo": "bar"], to: #function).wait()
+        _ = try connection.xadd(["foo": "bar", "baz": "qux"], to: #function).wait()
         }
-        let response: [RESPValue] = try connection.xread(from: [#function: "0-0"]).wait()
+        let response: XReadResult = try connection.xread(from: [#function: "0-0"]).wait()
+
+        // Verify we get results for one stream
         XCTAssertEqual(response.count, 1)
-        let streamResults: [RESPValue] = response[0].array!
-        let streamName = streamResults[0].string
-        XCTAssertEqual(streamName, #function)
+        XCTAssertEqual(response[0].0, #function)
 
-        let streamEntries = streamResults[1].array!
-        XCTAssertEqual(streamEntries.count, 3)
-
-        XCTAssert(streamEntries.allSatisfy { entryPairRESP in
-            let entryPair = entryPairRESP.array!
-            let fields = entryPair[1].array!
-            return fields.count == 2
+        // Verify we get the three entries back that we added
+        let entries: [(String, [String : String])] = response[0].1
+        XCTAssertEqual(entries.count, 3)
+        XCTAssert(entries.allSatisfy {
+            $0.1["foo"] == "bar" && $0.1["baz"] == "qux"
         })
     }
 }
