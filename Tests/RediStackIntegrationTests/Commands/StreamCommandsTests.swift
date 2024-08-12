@@ -66,6 +66,18 @@ final class StreamCommandsTests: RediStackIntegrationTestCase {
         XCTAssertEqual(response.count, 1)
     }
 
+    func test_xrevrange() throws {
+        for _ in 1...3 {
+        _ = try connection.xadd(["foo": "bar", "baz": "qux"], to: #function).wait()
+        }
+        var response = try connection.xrevrange(from: "+", to: "-", from: #function).wait()
+        XCTAssertEqual(response.count, 3)
+        XCTAssertGreaterThan(response[0].0, response[2].0)
+
+        response = try connection.xrevrange(from: "+", to: "-", from: #function, 1).wait()
+        XCTAssertEqual(response.count, 1)
+    }
+
     func test_xread() throws {
         for _ in 1...3 {
         _ = try connection.xadd(["foo": "bar", "baz": "qux"], to: #function).wait()

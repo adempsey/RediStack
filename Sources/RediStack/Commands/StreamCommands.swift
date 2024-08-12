@@ -129,21 +129,77 @@ extension RedisClient {
         
         return send(command: "XRANGE", with: args)
             .map { (resultRESP: RESPValue) in
-                guard let results: [RESPValue] = resultRESP.array else { return [] } 
-                return results.map { (result: RESPValue) -> (String, [String:String]) in
-                    guard let entries: [RESPValue] = result.array else { return ("", [:])}
-                    guard let entryID: String = entries[0].string else { return ("", [:])}
-                    guard let fields: [RESPValue] = entries[1].array else { return (entryID, [:])}
-                    var fieldsDict: [String: String] = [:]
-                    for i in stride(from: 0, to: fields.count, by: 2) {
-                        if i + 1 < fields.count {
-                            fieldsDict[fields[i].string!] = fields[i+1].string
-                        }
+            guard let results: [RESPValue] = resultRESP.array else { return [] } 
+            return results.map { (result: RESPValue) -> (String, [String:String]) in
+                guard let entries: [RESPValue] = result.array else { return ("", [:])}
+                guard let entryID: String = entries[0].string else { return ("", [:])}
+                guard let fields: [RESPValue] = entries[1].array else { return (entryID, [:])}
+                var fieldsDict: [String: String] = [:]
+                for i in stride(from: 0, to: fields.count, by: 2) {
+                    if i + 1 < fields.count {
+                        fieldsDict[fields[i].string!] = fields[i+1].string
                     }
-                    return (entryID, fieldsDict)
                 }
+                return (entryID, fieldsDict)
             }
         }
+    }
+
+    /// This command is exactly like XRANGE, but with the notable difference of
+    /// returning the entries in reverse order, and also taking the start-end
+    /// range in reverse order: in XREVRANGE you need to state the end ID and
+    /// later the start ID, and the command will produce all the elements between
+    /// (or exactly like) the two IDs, starting from the end side.
+    ///
+    /// See [https://redis.io/commands/xrevrange](https://redis.io/commands/xrevrange)
+    /// - Parameters:
+    ///     - end: The entry ID to start reading from.
+    ///     - start: The entry ID to stop reading at.
+    ///     - key: The stream to read entries from.
+    /// - Returns: A list of 2-tuples, the first element of which is the entry
+    ///            ID, and the second element of which is a dictionary mapping 
+    ///            entry field keys to values.
+    ///            For example:
+    ///            [
+    ///                ("id-1234", ["foo": "bar"]),
+    ///                ("id-5678", ["baz": "qux"]),
+    ///                ("id-1234", ["foo": "bar"]),
+    ///                ("id-5678", ["baz": "qux"]),
+    ///            ]
+    public func xrevrange(
+        from end: String, 
+        to start: String, 
+        from key: RedisKey, 
+        _ count: UInt? = nil
+    ) -> EventLoopFuture<[(String, [String:String])]> {
+        var args: [RESPValue] = [
+            .init(from: key),
+            .init(from: end),
+            .init(from: start),
+        ]
+
+        if count != nil {
+            args.append(RESPValue(from: "COUNT"))
+            args.append(convertingContentsOf: [count])
+        }
+        
+        return send(command: "XREVRANGE", with: args)
+            .map { (resultRESP: RESPValue) in
+            guard let results: [RESPValue] = resultRESP.array else { return [] } 
+            return results.map { (result: RESPValue) -> (String, [String:String]) in
+                guard let entries: [RESPValue] = result.array else { return ("", [:])}
+                guard let entryID: String = entries[0].string else { return ("", [:])}
+                guard let fields: [RESPValue] = entries[1].array else { return (entryID, [:])}
+                var fieldsDict: [String: String] = [:]
+                for i in stride(from: 0, to: fields.count, by: 2) {
+                    if i + 1 < fields.count {
+                        fieldsDict[fields[i].string!] = fields[i+1].string
+                    }
+                }
+                return (entryID, fieldsDict)
+            }
+        }
+    }
     
 
     public typealias XReadResult = [(String, [(String, [String: String])])]
