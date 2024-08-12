@@ -90,6 +90,62 @@ extension RedisClient {
             .tryConverting()
     }
 
+    /// The command returns the stream entries matching a given range of IDs.
+    /// The range is specified by a minimum and maximum ID. All the entries
+    /// having an ID between the two specified or exactly one of the two IDs
+    /// specified (closed interval) are returned.
+    ///
+    /// See [https://redis.io/commands/xrange](https://redis.io/commands/xrange)
+    /// - Parameters:
+    ///     - start: The entry ID to begin reading from.
+    ///     - end: The entry ID to stop reading at.
+    ///     - key: The stream to read entries from.
+    /// - Returns: A list of 2-tuples, the first element of which is the entry
+    ///            ID, and the second element of which is a dictionary mapping 
+    ///            entry field keys to values.
+    ///            For example:
+    ///            [
+    ///                ("id-1234", ["foo": "bar"]),
+    ///                ("id-5678", ["baz": "qux"]),
+    ///                ("id-1234", ["foo": "bar"]),
+    ///                ("id-5678", ["baz": "qux"]),
+    ///            ]
+    public func xrange(
+        from start: String, 
+        to end: String, 
+        from key: RedisKey, 
+        _ count: UInt? = nil
+    ) -> EventLoopFuture<[(String, [String:String])]> {
+        var args: [RESPValue] = [
+            .init(from: key),
+            .init(from: start),
+            .init(from: end)
+        ]
+
+        if count != nil {
+            args.append(RESPValue(from: "COUNT"))
+            args.append(convertingContentsOf: [count])
+        }
+        
+        return send(command: "XRANGE", with: args)
+            .map { (resultRESP: RESPValue) in
+                guard let results: [RESPValue] = resultRESP.array else { return [] } 
+                return results.map { (result: RESPValue) -> (String, [String:String]) in
+                    guard let entries: [RESPValue] = result.array else { return ("", [:])}
+                    guard let entryID: String = entries[0].string else { return ("", [:])}
+                    guard let fields: [RESPValue] = entries[1].array else { return (entryID, [:])}
+                    var fieldsDict: [String: String] = [:]
+                    for i in stride(from: 0, to: fields.count, by: 2) {
+                        if i + 1 < fields.count {
+                            fieldsDict[fields[i].string!] = fields[i+1].string
+                        }
+                    }
+                    return (entryID, fieldsDict)
+                }
+            }
+        }
+    
+
     public typealias XReadResult = [(String, [(String, [String: String])])]
 
     /// Read data from one or multiple streams, only returning entries with
