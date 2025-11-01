@@ -12,16 +12,18 @@
 //
 //===----------------------------------------------------------------------===//
 
-@testable import RediStack
 import RediStackTestUtils
 import XCTest
+
+@testable import RediStack
 
 public typealias XReadResult = [(String, [(String, [String: String])])]
 
 final class StreamCommandsTests: RediStackIntegrationTestCase {
 
     func test_xadd() throws {
-        var streamLength: Int = try connection.send(command: "XLEN", with: [#function.convertedToRESPValue()]).wait().int!
+        var streamLength: Int = try connection.send(command: "XLEN", with: [#function.convertedToRESPValue()]).wait()
+            .int!
         XCTAssertEqual(streamLength, 0)
         let entry_id = try connection.xadd(["foo": "bar"], to: #function).wait()
         streamLength = try connection.send(command: "XLEN", with: [#function.convertedToRESPValue()]).wait().int!
@@ -46,7 +48,7 @@ final class StreamCommandsTests: RediStackIntegrationTestCase {
 
     func test_xtrim() throws {
         for _ in 1...3 {
-        _ = try connection.xadd(["foo": "bar"], to: #function).wait()
+            _ = try connection.xadd(["foo": "bar"], to: #function).wait()
         }
         XCTAssertEqual(try connection.xlen(of: #function).wait(), 3)
         let numDeleted = try connection.xtrim(to: 1, from: #function).wait()
@@ -56,7 +58,7 @@ final class StreamCommandsTests: RediStackIntegrationTestCase {
 
     func test_xrange() throws {
         for _ in 1...3 {
-        _ = try connection.xadd(["foo": "bar", "baz": "qux"], to: #function).wait()
+            _ = try connection.xadd(["foo": "bar", "baz": "qux"], to: #function).wait()
         }
         var response = try connection.xrange(from: "-", to: "+", from: #function).wait()
         XCTAssertEqual(response.count, 3)
@@ -68,7 +70,7 @@ final class StreamCommandsTests: RediStackIntegrationTestCase {
 
     func test_xrevrange() throws {
         for _ in 1...3 {
-        _ = try connection.xadd(["foo": "bar", "baz": "qux"], to: #function).wait()
+            _ = try connection.xadd(["foo": "bar", "baz": "qux"], to: #function).wait()
         }
         var response = try connection.xrevrange(from: "+", to: "-", from: #function).wait()
         XCTAssertEqual(response.count, 3)
@@ -80,7 +82,7 @@ final class StreamCommandsTests: RediStackIntegrationTestCase {
 
     func test_xread() throws {
         for _ in 1...3 {
-        _ = try connection.xadd(["foo": "bar", "baz": "qux"], to: #function).wait()
+            _ = try connection.xadd(["foo": "bar", "baz": "qux"], to: #function).wait()
         }
         let response: XReadResult = try connection.xread(from: [#function: "0-0"]).wait()
 
@@ -89,10 +91,12 @@ final class StreamCommandsTests: RediStackIntegrationTestCase {
         XCTAssertEqual(response[0].0, #function)
 
         // Verify we get the three entries back that we added
-        let entries: [(String, [String : String])] = response[0].1
+        let entries: [(String, [String: String])] = response[0].1
         XCTAssertEqual(entries.count, 3)
-        XCTAssert(entries.allSatisfy {
-            $0.1["foo"] == "bar" && $0.1["baz"] == "qux"
-        })
+        XCTAssert(
+            entries.allSatisfy {
+                $0.1["foo"] == "bar" && $0.1["baz"] == "qux"
+            }
+        )
     }
 }

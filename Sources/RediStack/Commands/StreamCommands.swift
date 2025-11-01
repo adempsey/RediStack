@@ -14,13 +14,15 @@
 
 import NIOCore
 
-
 // MARK: General
 
 extension RedisClient {
 
     @inlinable
-    public func xadd<Value: RESPValueConvertible>(_ elements: [Value: Value], to key: RedisKey) -> EventLoopFuture<String> {
+    public func xadd<Value: RESPValueConvertible>(
+        _ elements: [Value: Value],
+        to key: RedisKey
+    ) -> EventLoopFuture<String> {
         guard elements.count > 0 else { return self.eventLoop.makeSucceededFuture("") }
 
         var elementList = [Value]()
@@ -37,7 +39,6 @@ extension RedisClient {
             .tryConverting()
     }
 
-
     /// Gets the number of entries inside a stream.
     ///
     /// See [https://redis.io/commands/xlen](https://redis.io/commands/xlen)
@@ -47,7 +48,6 @@ extension RedisClient {
         let args = [RESPValue(from: key)]
         return send(command: "XLEN", with: args).tryConverting()
     }
-
 
     /// Removes the specified entries from a stream, and returns the number
     /// of entries deleted. This number may be less than the number of IDs
@@ -84,7 +84,7 @@ extension RedisClient {
         let args: [RESPValue] = [
             .init(from: key),
             .init(bulk: "MAXLEN"),
-            .init(bulk: threshold)
+            .init(bulk: threshold),
         ]
         return send(command: "XTRIM", with: args)
             .tryConverting()
@@ -101,7 +101,7 @@ extension RedisClient {
     ///     - end: The entry ID to stop reading at.
     ///     - key: The stream to read entries from.
     /// - Returns: A list of 2-tuples, the first element of which is the entry
-    ///            ID, and the second element of which is a dictionary mapping 
+    ///            ID, and the second element of which is a dictionary mapping
     ///            entry field keys to values.
     ///            For example:
     ///            [
@@ -111,38 +111,38 @@ extension RedisClient {
     ///                ("id-5678", ["baz": "qux"]),
     ///            ]
     public func xrange(
-        from start: String, 
-        to end: String, 
-        from key: RedisKey, 
+        from start: String,
+        to end: String,
+        from key: RedisKey,
         _ count: UInt? = nil
-    ) -> EventLoopFuture<[(String, [String:String])]> {
+    ) -> EventLoopFuture<[(String, [String: String])]> {
         var args: [RESPValue] = [
             .init(from: key),
             .init(from: start),
-            .init(from: end)
+            .init(from: end),
         ]
 
         if count != nil {
             args.append(RESPValue(from: "COUNT"))
             args.append(convertingContentsOf: [count])
         }
-        
+
         return send(command: "XRANGE", with: args)
             .map { (resultRESP: RESPValue) in
-            guard let results: [RESPValue] = resultRESP.array else { return [] } 
-            return results.map { (result: RESPValue) -> (String, [String:String]) in
-                guard let entries: [RESPValue] = result.array else { return ("", [:])}
-                guard let entryID: String = entries[0].string else { return ("", [:])}
-                guard let fields: [RESPValue] = entries[1].array else { return (entryID, [:])}
-                var fieldsDict: [String: String] = [:]
-                for i in stride(from: 0, to: fields.count, by: 2) {
-                    if i + 1 < fields.count {
-                        fieldsDict[fields[i].string!] = fields[i+1].string
+                guard let results: [RESPValue] = resultRESP.array else { return [] }
+                return results.map { (result: RESPValue) -> (String, [String: String]) in
+                    guard let entries: [RESPValue] = result.array else { return ("", [:]) }
+                    guard let entryID: String = entries[0].string else { return ("", [:]) }
+                    guard let fields: [RESPValue] = entries[1].array else { return (entryID, [:]) }
+                    var fieldsDict: [String: String] = [:]
+                    for i in stride(from: 0, to: fields.count, by: 2) {
+                        if i + 1 < fields.count {
+                            fieldsDict[fields[i].string!] = fields[i + 1].string
+                        }
                     }
+                    return (entryID, fieldsDict)
                 }
-                return (entryID, fieldsDict)
             }
-        }
     }
 
     /// This command is exactly like XRANGE, but with the notable difference of
@@ -157,7 +157,7 @@ extension RedisClient {
     ///     - start: The entry ID to stop reading at.
     ///     - key: The stream to read entries from.
     /// - Returns: A list of 2-tuples, the first element of which is the entry
-    ///            ID, and the second element of which is a dictionary mapping 
+    ///            ID, and the second element of which is a dictionary mapping
     ///            entry field keys to values.
     ///            For example:
     ///            [
@@ -167,11 +167,11 @@ extension RedisClient {
     ///                ("id-5678", ["baz": "qux"]),
     ///            ]
     public func xrevrange(
-        from end: String, 
-        to start: String, 
-        from key: RedisKey, 
+        from end: String,
+        to start: String,
+        from key: RedisKey,
         _ count: UInt? = nil
-    ) -> EventLoopFuture<[(String, [String:String])]> {
+    ) -> EventLoopFuture<[(String, [String: String])]> {
         var args: [RESPValue] = [
             .init(from: key),
             .init(from: end),
@@ -182,25 +182,24 @@ extension RedisClient {
             args.append(RESPValue(from: "COUNT"))
             args.append(convertingContentsOf: [count])
         }
-        
+
         return send(command: "XREVRANGE", with: args)
             .map { (resultRESP: RESPValue) in
-            guard let results: [RESPValue] = resultRESP.array else { return [] } 
-            return results.map { (result: RESPValue) -> (String, [String:String]) in
-                guard let entries: [RESPValue] = result.array else { return ("", [:])}
-                guard let entryID: String = entries[0].string else { return ("", [:])}
-                guard let fields: [RESPValue] = entries[1].array else { return (entryID, [:])}
-                var fieldsDict: [String: String] = [:]
-                for i in stride(from: 0, to: fields.count, by: 2) {
-                    if i + 1 < fields.count {
-                        fieldsDict[fields[i].string!] = fields[i+1].string
+                guard let results: [RESPValue] = resultRESP.array else { return [] }
+                return results.map { (result: RESPValue) -> (String, [String: String]) in
+                    guard let entries: [RESPValue] = result.array else { return ("", [:]) }
+                    guard let entryID: String = entries[0].string else { return ("", [:]) }
+                    guard let fields: [RESPValue] = entries[1].array else { return (entryID, [:]) }
+                    var fieldsDict: [String: String] = [:]
+                    for i in stride(from: 0, to: fields.count, by: 2) {
+                        if i + 1 < fields.count {
+                            fieldsDict[fields[i].string!] = fields[i + 1].string
+                        }
                     }
+                    return (entryID, fieldsDict)
                 }
-                return (entryID, fieldsDict)
             }
-        }
     }
-    
 
     public typealias XReadResult = [(String, [(String, [String: String])])]
 
@@ -231,42 +230,42 @@ extension RedisClient {
     public func xread<Value: RESPValueConvertible>(
         from streams: [Value: Value],
         _ count: UInt = 0
-        ) -> EventLoopFuture<XReadResult> {
+    ) -> EventLoopFuture<XReadResult> {
 
-            var streamList = [Value]()
-            for (key, value) in streams {
-                streamList.append(key)
-                streamList.append(value)
-            }
-            var args: [RESPValue] = [
-                .init(bulk: "COUNT"),
-                .init(from: count),
-                .init(bulk: "STREAMS"),
-            ]
-            args.append(convertingContentsOf: streamList)
+        var streamList = [Value]()
+        for (key, value) in streams {
+            streamList.append(key)
+            streamList.append(value)
+        }
+        var args: [RESPValue] = [
+            .init(bulk: "COUNT"),
+            .init(from: count),
+            .init(bulk: "STREAMS"),
+        ]
+        args.append(convertingContentsOf: streamList)
 
-            return send(command: "XREAD", with: args)
-                .map { (resultRESP: RESPValue) in
-                    guard let results: [RESPValue] = Array(fromRESP: resultRESP) else { return [] }
-                    return results.map { (result: RESPValue) -> (String,[(String, [String: String])]) in
-                        guard let streamResults: [RESPValue]  = result.array else { return ("", []) }
-                        guard let stream: String = streamResults[0].string else { return ("", []) }
-                        guard let entries: [RESPValue] = streamResults[1].array else { return (stream, [])}
-                        let decodedEntries: [(String, [String: String])] = entries.map { (entry: RESPValue) in
-                            guard let decodedEntry: [RESPValue] = entry.array else { return ("", [:]) }
-                            guard let entryID: String = decodedEntry[0].string else { return ("", [:])}
+        return send(command: "XREAD", with: args)
+            .map { (resultRESP: RESPValue) in
+                guard let results: [RESPValue] = Array(fromRESP: resultRESP) else { return [] }
+                return results.map { (result: RESPValue) -> (String, [(String, [String: String])]) in
+                    guard let streamResults: [RESPValue] = result.array else { return ("", []) }
+                    guard let stream: String = streamResults[0].string else { return ("", []) }
+                    guard let entries: [RESPValue] = streamResults[1].array else { return (stream, []) }
+                    let decodedEntries: [(String, [String: String])] = entries.map { (entry: RESPValue) in
+                        guard let decodedEntry: [RESPValue] = entry.array else { return ("", [:]) }
+                        guard let entryID: String = decodedEntry[0].string else { return ("", [:]) }
 
-                            guard let fieldArray: [RESPValue] = decodedEntry[1].array else { return (entryID, [:])}
-                            var fields: [String: String] = [:]
-                            for i in stride(from: 0, to: fieldArray.count, by: 2) {
-                                if i + 1 < fieldArray.count {
-                                    fields[fieldArray[i].string!] = fieldArray[i+1].string
-                                }
+                        guard let fieldArray: [RESPValue] = decodedEntry[1].array else { return (entryID, [:]) }
+                        var fields: [String: String] = [:]
+                        for i in stride(from: 0, to: fieldArray.count, by: 2) {
+                            if i + 1 < fieldArray.count {
+                                fields[fieldArray[i].string!] = fieldArray[i + 1].string
                             }
-                            return (entryID, fields)
                         }
-                        return (stream, decodedEntries)
+                        return (entryID, fields)
                     }
+                    return (stream, decodedEntries)
                 }
+            }
     }
 }
