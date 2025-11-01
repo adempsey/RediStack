@@ -18,10 +18,21 @@ import NIOCore
 
 extension RedisClient {
 
+    /// Appends the specified stream entry to the stream at the specified key.
+    /// If the key does not exist, `XADD` will create a new key with the given
+    /// stream value as a side effect of running this command.
+    ///
+    /// See [https://redis.io/docs/latest/commands/xadd/](https://redis.io/docs/latest/commands/xadd/)
+    /// - Parameters:
+    ///     - elements: The field-value pairs to include in the new entry.
+    ///     - key: The stream to append the new entry to.
+    /// - Returns: the entry ID of the newly created entry
     @inlinable
     public func xadd<Value: RESPValueConvertible>(
         _ elements: [Value: Value],
-        to key: RedisKey
+        to key: RedisKey,
+        _ id: String = "*",
+        noMakeStream: Bool = false
     ) -> EventLoopFuture<String> {
         guard elements.count > 0 else { return self.eventLoop.makeSucceededFuture("") }
 
@@ -32,7 +43,10 @@ extension RedisClient {
         }
 
         var args: [RESPValue] = [.init(from: key)]
-        args.append(RESPValue(from: "*"))
+        args.append(RESPValue(from: id))
+        if noMakeStream {
+            args.append(RESPValue(from: "NOMKSTREAM"))
+        }
         args.append(convertingContentsOf: elementList)
 
         return send(command: "XADD", with: args)
