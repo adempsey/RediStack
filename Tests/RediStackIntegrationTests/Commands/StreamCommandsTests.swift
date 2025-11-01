@@ -42,8 +42,12 @@ final class StreamCommandsTests: RediStackIntegrationTestCase {
     func test_xdel() throws {
         let entryID = try connection.xadd(["foo": "bar"], to: #function).wait()
         XCTAssertEqual(try connection.xlen(of: #function).wait(), 1)
-        _ = try connection.xdel(entryID, from: #function).wait()
+        let entriesDeleted = try connection.xdel(entryID, from: #function).wait()
+        XCTAssertEqual(entriesDeleted, 1)
         XCTAssertEqual(try connection.xlen(of: #function).wait(), 0)
+
+        let nonExistentEntryID = "123"
+        XCTAssertEqual(try connection.xdel(nonExistentEntryID, from: #function).wait(), 0)
     }
 
     func test_xtrim() throws {
